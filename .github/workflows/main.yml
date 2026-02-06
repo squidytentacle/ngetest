@@ -1,4 +1,4 @@
-name: RDP_Light
+name: RDP_Tailscale
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
 jobs:
   rdp:
     runs-on: windows-latest
-    timeout-minutes: 360
+    timeout-minutes: 360   # 6 jam maksimal
 
     steps:
       - name: Enable RDP
@@ -18,7 +18,7 @@ jobs:
 
       - name: Create RDP User
         run: |
-          $password = "Password123!"
+          $password = "TipsUNIX123!"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
@@ -26,26 +26,27 @@ jobs:
           echo "RDP_USER=RDP" >> $env:GITHUB_ENV
           echo "RDP_PASS=$password" >> $env:GITHUB_ENV
 
-      - name: Download ngrok
+      - name: Install Tailscale
         run: |
-          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-          Expand-Archive ngrok.zip -DestinationPath $env:USERPROFILE\ngrok
-          Remove-Item ngrok.zip
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          $installerPath = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
 
-      - name: Run ngrok tunnel
+      - name: Connect Tailscale
         run: |
-          $env:NGROK_AUTHTOKEN="${{ secrets.NGROK_AUTH_TOKEN }}"
-          & "$env:USERPROFILE\ngrok\ngrok.exe" config add-authtoken $env:NGROK_AUTHTOKEN
-          Start-Process -NoNewWindow -FilePath "$env:USERPROFILE\ngrok\ngrok.exe" -ArgumentList "tcp 3389"
-          Start-Sleep -Seconds 10
-          $tunnels = & "$env:USERPROFILE\ngrok\ngrok.exe" api list-tunnels
-          echo "NGROK_TUNNELS=$tunnels" >> $env:GITHUB_ENV
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up `
+            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} `
+            --hostname=gh-runner-$env:GITHUB_RUN_ID
+          $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       - name: Show Connection Info
         run: |
           Write-Host "=== RDP ACCESS ==="
+          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
           Write-Host "User: $env:RDP_USER"
           Write-Host "Pass: $env:RDP_PASS"
-          Write-Host "Ngrok Tunnel Info: $env:NGROK_TUNNELS"
           Write-Host "=================="
           while ($true) { Start-Sleep -Seconds 300 }
