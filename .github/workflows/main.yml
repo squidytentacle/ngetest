@@ -1,0 +1,51 @@
+name: RDP_Light
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+                           -Name "fDenyTSConnections" -Value 0 -Force
+          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
+          Restart-Service -Name TermService -Force
+
+      - name: Create RDP User
+        run: |
+          $password = "Password123!"
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
+          echo "RDP_USER=RDP" >> $env:GITHUB_ENV
+          echo "RDP_PASS=$password" >> $env:GITHUB_ENV
+
+      - name: Download ngrok
+        run: |
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+          Expand-Archive ngrok.zip -DestinationPath $env:USERPROFILE\ngrok
+          Remove-Item ngrok.zip
+
+      - name: Run ngrok tunnel
+        run: |
+          $env:NGROK_AUTHTOKEN="${{ secrets.NGROK_AUTH_TOKEN }}"
+          & "$env:USERPROFILE\ngrok\ngrok.exe" config add-authtoken $env:NGROK_AUTHTOKEN
+          Start-Process -NoNewWindow -FilePath "$env:USERPROFILE\ngrok\ngrok.exe" -ArgumentList "tcp 3389"
+          Start-Sleep -Seconds 10
+          $tunnels = & "$env:USERPROFILE\ngrok\ngrok.exe" api list-tunnels
+          echo "NGROK_TUNNELS=$tunnels" >> $env:GITHUB_ENV
+
+      - name: Show Connection Info
+        run: |
+          Write-Host "=== RDP ACCESS ==="
+          Write-Host "User: $env:RDP_USER"
+          Write-Host "Pass: $env:RDP_PASS"
+          Write-Host "Ngrok Tunnel Info: $env:NGROK_TUNNELS"
+          Write-Host "=================="
+          while ($true) { Start-Sleep -Seconds 300 }
