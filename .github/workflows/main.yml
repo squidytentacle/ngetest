@@ -9,15 +9,12 @@ jobs:
     timeout-minutes: 720
 
     steps:
-      - name: Install RDP Wrapper
+      - name: Install RDP Wrapper (asmtron fork)
         run: |
-          $url = "https://github.com/stascorp/rdpwrap/releases/download/v1.6.2/RDPWInst-v1.6.2.zip"
-          $dest = "$env:TEMP\rdpwrap.zip"
+          $url = "https://github.com/asmtron/rdpwrap/releases/download/v1.4/RDPWrap-with-Autoupdate-v1.4-Installer.exe"
+          $dest = "$env:TEMP\rdpwrap-installer.exe"
           Invoke-WebRequest -Uri $url -OutFile $dest
-          Expand-Archive -Path $dest -DestinationPath "$env:TEMP\rdpwrap" -Force
-          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-i" -Wait
-          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-o" -Wait
-          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-r" -Wait
+          Start-Process $dest -ArgumentList "/silent" -Wait
           Remove-Item $dest -Force
 
       - name: Verify RDP Port 3389
@@ -89,7 +86,7 @@ jobs:
                   $newX = $pos.X + (Get-Random -Minimum -5 -Maximum 5)
                   $newY = $pos.Y + (Get-Random -Minimum -5 -Maximum 5)
                   [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($newX, $newY)
-                  Start-Sleep -Seconds (Get-Random -Minimum 3 -Maximum 5)
+                  Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 4)
               }
           }
           Start-Job -ScriptBlock {
