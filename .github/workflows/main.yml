@@ -1,4 +1,4 @@
-name: mybot
+name: Gb_Tailscale_SelfHosted
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
         run: |
           # Buat RDP1 kalau belum ada
           if (-not (Get-LocalUser -Name "RDP1" -ErrorAction SilentlyContinue)) {
-              $pass1 = ConvertTo-SecureString "TipsUNIX1!" -AsPlainText -Force
+              $pass1 = ConvertTo-SecureString "lostsaga" -AsPlainText -Force
               New-LocalUser -Name "RDP1" -Password $pass1 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
           } else {
@@ -35,7 +35,7 @@ jobs:
 
           # Buat RDP2 kalau belum ada
           if (-not (Get-LocalUser -Name "RDP2" -ErrorAction SilentlyContinue)) {
-              $pass2 = ConvertTo-SecureString "TipsUNIX2!" -AsPlainText -Force
+              $pass2 = ConvertTo-SecureString "lostsagavfun" -AsPlainText -Force
               New-LocalUser -Name "RDP2" -Password $pass2 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
           } else {
@@ -43,9 +43,9 @@ jobs:
           }
 
           echo "RDP1_USER=RDP1" >> $env:GITHUB_ENV
-          echo "RDP1_PASS=TipsUNIX1!" >> $env:GITHUB_ENV
+          echo "RDP1_PASS=lostsaga" >> $env:GITHUB_ENV
           echo "RDP2_USER=RDP2" >> $env:GITHUB_ENV
-          echo "RDP2_PASS=TipsUNIX2!" >> $env:GITHUB_ENV
+          echo "RDP2_PASS=lostsagavfun" >> $env:GITHUB_ENV
 
       - name: Install Tailscale (if not installed)
         run: |
@@ -65,14 +65,14 @@ jobs:
           $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
-      - name: Download Lost Saga Origin Launcher
+      - name: Download VFun Launcher
         run: |
-          $url = "https://download.vfuns.com/LostSagaOriginInstaller.exe"
-          $dest = "C:\LostSagaOriginInstaller.exe"
+          $url = "https://vfun-cdn.qijisoft.com/vlauncher/fullclient/VFUNLauncherInstaller.exe"
+          $dest = "C:\VFUNLauncherInstaller.exe"
           if (-not (Test-Path $dest)) {
             Invoke-WebRequest -Uri $url -OutFile $dest
           }
-          Write-Host "Launcher available at $dest"
+          Write-Host "VFun Launcher available at $dest"
 
       - name: Start Anti-AFK + Ping in Background
         run: |
@@ -109,6 +109,6 @@ jobs:
           Write-Host "Tailscale IP: $env:TAILSCALE_IP"
           Write-Host "User1: $env:RDP1_USER | Pass: $env:RDP1_PASS"
           Write-Host "User2: $env:RDP2_USER | Pass: $env:RDP2_PASS"
-          Write-Host "Lost Saga Launcher: C:\LostSagaOriginInstaller.exe"
+          Write-Host "VFun Launcher: C:\VFUNLauncherInstaller.exe"
           Write-Host "Anti-AFK + Ping script running in background"
           Write-Host "=================="
