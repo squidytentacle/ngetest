@@ -1,12 +1,12 @@
-name: RDP_Tailscale_Final
+name: RDP_Tailscale_SelfHosted
 
 on:
   workflow_dispatch:
 
 jobs:
   rdp:
-    runs-on: windows-latest
-    timeout-minutes: 720   # 12 jam maksimal
+    runs-on: self-hosted
+    timeout-minutes: 720
 
     steps:
       - name: Enable RDP
@@ -16,7 +16,7 @@ jobs:
           netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
-      - name: Disable Idle Timeout (Keep Alive)
+      - name: Disable Idle Timeout
         run: |
           reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v KeepAliveEnable /t REG_DWORD /d 1 /f
           reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v KeepAliveInterval /t REG_DWORD /d 1 /f
@@ -28,50 +28,36 @@ jobs:
           $pass2 = "TipsUNIX2!"
           $securePass1 = ConvertTo-SecureString $pass1 -AsPlainText -Force
           $securePass2 = ConvertTo-SecureString $pass2 -AsPlainText -Force
-          New-LocalUser -Name "RDP1" -Password $securePass1 -AccountNeverExpires
-          New-LocalUser -Name "RDP2" -Password $securePass2 -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP1"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP2"
+          if (-not (Get-LocalUser -Name "RDP1" -ErrorAction SilentlyContinue)) {
+            New-LocalUser -Name "RDP1" -Password $securePass1 -AccountNeverExpires
+            Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
+            Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP1"
+          }
+          if (-not (Get-LocalUser -Name "RDP2" -ErrorAction SilentlyContinue)) {
+            New-LocalUser -Name "RDP2" -Password $securePass2 -AccountNeverExpires
+            Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
+            Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP2"
+          }
           echo "RDP1_USER=RDP1" >> $env:GITHUB_ENV
           echo "RDP1_PASS=$pass1" >> $env:GITHUB_ENV
           echo "RDP2_USER=RDP2" >> $env:GITHUB_ENV
           echo "RDP2_PASS=$pass2" >> $env:GITHUB_ENV
 
-      - name: Install Tailscale
-        run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
-          $installerPath = "$env:TEMP\tailscale.msi"
-          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
-
-      - name: Connect Tailscale
-        run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up `
-            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} `
-            --hostname=gh-runner-$env:GITHUB_RUN_ID
-          $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
-
       - name: Download Lost Saga Origin Launcher
         run: |
-          $url = "https://download.vfuns.com/LostSagaOriginInstaller.exe"   # ganti dengan link resmi dari VFUN
+          $url = "https://download.vfuns.com/LostSagaOriginInstaller.exe"
           $dest = "C:\LostSagaOriginInstaller.exe"
-          Invoke-WebRequest -Uri $url -OutFile $dest
-          Write-Host "Launcher downloaded to $dest"
+          if (-not (Test-Path $dest)) {
+            Invoke-WebRequest -Uri $url -OutFile $dest
+          }
+          Write-Host "Launcher available at $dest"
 
       - name: Start Anti-AFK + Ping in Background
         run: |
           $script = @'
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
-
-          # Anti-AFK job
           Start-Job -ScriptBlock {
-              Add-Type -AssemblyName System.Windows.Forms
-              Add-Type -AssemblyName System.Drawing
               $wshell = New-Object -ComObject wscript.shell
               while ($true) {
                   $keys = @("a","d","{LEFT}","{RIGHT}","{UP}","{DOWN}"," ")
@@ -81,11 +67,9 @@ jobs:
                   $newX = $pos.X + (Get-Random -Minimum -5 -Maximum 5)
                   $newY = $pos.Y + (Get-Random -Minimum -5 -Maximum 5)
                   [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($newX, $newY)
-                  Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 4)
+                  Start-Sleep -Seconds (Get-Random -Minimum 3 -Maximum 5)
               }
           }
-
-          # Ping job
           Start-Job -ScriptBlock {
               while ($true) {
                   Test-Connection -ComputerName "google.com" -Count 1 | Out-Null
@@ -100,10 +84,8 @@ jobs:
       - name: Show Connection Info
         run: |
           Write-Host "=== RDP ACCESS ==="
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
           Write-Host "User1: $env:RDP1_USER | Pass: $env:RDP1_PASS"
           Write-Host "User2: $env:RDP2_USER | Pass: $env:RDP2_PASS"
           Write-Host "Lost Saga Launcher: C:\LostSagaOriginInstaller.exe"
-          Write-Host "Anti-AFK + Ping script running in background (persists even if RDP minimized)"
+          Write-Host "Anti-AFK + Ping script running in background"
           Write-Host "=================="
-          while ($true) { Start-Sleep -Seconds 300 }
