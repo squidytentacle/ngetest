@@ -1,4 +1,4 @@
-name: Gb_Tailscale_SelfHosted
+name: RDP_Tailscale_RDPWrapper
 
 on:
   workflow_dispatch:
@@ -9,39 +9,39 @@ jobs:
     timeout-minutes: 720
 
     steps:
-      - name: Enable RDP
+      - name: Install RDP Wrapper
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                           -Name "fDenyTSConnections" -Value 0 -Force
-          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
-          Restart-Service -Name TermService -Force
+          $url = "https://github.com/stascorp/rdpwrap/releases/download/v1.6.2/RDPWInst-v1.6.2.zip"
+          $dest = "$env:TEMP\rdpwrap.zip"
+          Invoke-WebRequest -Uri $url -OutFile $dest
+          Expand-Archive -Path $dest -DestinationPath "$env:TEMP\rdpwrap" -Force
+          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-i" -Wait
+          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-o" -Wait
+          Start-Process "$env:TEMP\rdpwrap\RDPWInst.exe" -ArgumentList "-r" -Wait
+          Remove-Item $dest -Force
 
-      - name: Disable Idle Timeout
+      - name: Verify RDP Port 3389
         run: |
-          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v KeepAliveEnable /t REG_DWORD /d 1 /f
-          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v KeepAliveInterval /t REG_DWORD /d 1 /f
-          reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v KeepAliveTime /t REG_DWORD /d 60000 /f
+          $rdpPort = netstat -an | findstr 3389
+          if ($rdpPort) {
+              Write-Host "✅ Port 3389 is LISTENING"
+          } else {
+              Write-Host "❌ Port 3389 is NOT LISTENING"
+              exit 1
+          }
 
       - name: Create RDP Users
         run: |
-          # Buat RDP1 kalau belum ada
           if (-not (Get-LocalUser -Name "RDP1" -ErrorAction SilentlyContinue)) {
               $pass1 = ConvertTo-SecureString "lostsaga" -AsPlainText -Force
               New-LocalUser -Name "RDP1" -Password $pass1 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
-          } else {
-              Write-Host "User RDP1 sudah ada."
           }
-
-          # Buat RDP2 kalau belum ada
           if (-not (Get-LocalUser -Name "RDP2" -ErrorAction SilentlyContinue)) {
               $pass2 = ConvertTo-SecureString "lostsagavfun" -AsPlainText -Force
               New-LocalUser -Name "RDP2" -Password $pass2 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
-          } else {
-              Write-Host "User RDP2 sudah ada."
           }
-
           echo "RDP1_USER=RDP1" >> $env:GITHUB_ENV
           echo "RDP1_PASS=lostsaga" >> $env:GITHUB_ENV
           echo "RDP2_USER=RDP2" >> $env:GITHUB_ENV
@@ -89,7 +89,7 @@ jobs:
                   $newX = $pos.X + (Get-Random -Minimum -5 -Maximum 5)
                   $newY = $pos.Y + (Get-Random -Minimum -5 -Maximum 5)
                   [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($newX, $newY)
-                  Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 4)
+                  Start-Sleep -Seconds (Get-Random -Minimum 3 -Maximum 5)
               }
           }
           Start-Job -ScriptBlock {
