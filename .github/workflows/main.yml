@@ -30,19 +30,19 @@ jobs:
       - name: Create RDP Users
         run: |
           if (-not (Get-LocalUser -Name "RDP1" -ErrorAction SilentlyContinue)) {
-              $pass1 = ConvertTo-SecureString "lostsaga" -AsPlainText -Force
+              $pass1 = ConvertTo-SecureString "Lostsaga1!" -AsPlainText -Force
               New-LocalUser -Name "RDP1" -Password $pass1 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
           }
           if (-not (Get-LocalUser -Name "RDP2" -ErrorAction SilentlyContinue)) {
-              $pass2 = ConvertTo-SecureString "lostsagavfun" -AsPlainText -Force
+              $pass2 = ConvertTo-SecureString "LostsagaVfun2!" -AsPlainText -Force
               New-LocalUser -Name "RDP2" -Password $pass2 -AccountNeverExpires
               Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
           }
           echo "RDP1_USER=RDP1" >> $env:GITHUB_ENV
-          echo "RDP1_PASS=lostsaga" >> $env:GITHUB_ENV
+          echo "RDP1_PASS=Lostsaga1!" >> $env:GITHUB_ENV
           echo "RDP2_USER=RDP2" >> $env:GITHUB_ENV
-          echo "RDP2_PASS=lostsagavfun" >> $env:GITHUB_ENV
+          echo "RDP2_PASS=LostsagaVfun2!" >> $env:GITHUB_ENV
 
       - name: Install Tailscale (if not installed)
         run: |
@@ -86,7 +86,7 @@ jobs:
                   $newX = $pos.X + (Get-Random -Minimum -5 -Maximum 5)
                   $newY = $pos.Y + (Get-Random -Minimum -5 -Maximum 5)
                   [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($newX, $newY)
-                  Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 4)
+                  Start-Sleep -Seconds (Get-Random -Minimum 3 -Maximum 5)
               }
           }
           Start-Job -ScriptBlock {
@@ -99,6 +99,14 @@ jobs:
           $scriptPath = "C:\keepalive.ps1"
           $script | Out-File -FilePath $scriptPath -Encoding UTF8
           Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File $scriptPath" -WindowStyle Hidden
+
+      - name: Keep GitHub Actions Alive
+        run: |
+          Write-Host "Keeping GitHub Actions alive for session..."
+          for ($i=0; $i -lt 720; $i++) {
+              Write-Host "Still running... minute $i"
+              Start-Sleep -Seconds 60
+          }
 
       - name: Show Connection Info
         run: |
