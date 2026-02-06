@@ -30,7 +30,7 @@ jobs:
       - name: Create & Reset RDP Users with Random Passwords
         run: |
           function New-RandomPassword {
-              param([int]$length = 12)
+              param([int]$length = 14)
               $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()'
               -join ((1..$length) | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
           }
@@ -46,14 +46,18 @@ jobs:
           } else {
               net user RDP1 $pass1Plain
           }
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
+          if (-not (Get-LocalGroupMember -Group "Administrators" -Member "RDP1" -ErrorAction SilentlyContinue)) {
+              Add-LocalGroupMember -Group "Administrators" -Member "RDP1"
+          }
 
           if (-not (Get-LocalUser -Name "RDP2" -ErrorAction SilentlyContinue)) {
               New-LocalUser -Name "RDP2" -Password $pass2 -AccountNeverExpires
           } else {
               net user RDP2 $pass2Plain
           }
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
+          if (-not (Get-LocalGroupMember -Group "Administrators" -Member "RDP2" -ErrorAction SilentlyContinue)) {
+              Add-LocalGroupMember -Group "Administrators" -Member "RDP2"
+          }
 
           echo "RDP1_USER=RDP1" >> $env:GITHUB_ENV
           echo "RDP1_PASS=$pass1Plain" >> $env:GITHUB_ENV
@@ -116,7 +120,7 @@ jobs:
           $script | Out-File -FilePath $scriptPath -Encoding UTF8
           Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File $scriptPath" -WindowStyle Hidden
 
-      - name: Keep GitHub Actions Alive (12h)
+      - name: Keep GitHub Actions Alive (12h with TCP log)
         run: |
           Write-Host "Keeping GitHub Actions alive for session..."
           for ($i=0; $i -lt 720; $i++) {
